@@ -1,0 +1,248 @@
+"use strict";
+/*
+ * Copyright 2009 ZXing authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = function (d, b) {
+        extendStatics = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+        return extendStatics(d, b);
+    };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+var __values = (this && this.__values) || function(o) {
+    var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
+    if (m) return m.call(o);
+    if (o && typeof o.length === "number") return {
+        next: function () {
+            if (o && i >= o.length) o = void 0;
+            return { value: o && o[i++], done: !o };
+        }
+    };
+    throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+var BarcodeFormat_1 = require("../../BarcodeFormat");
+var QRCodeDecoderMetaData_1 = require("../../qrcode/decoder/QRCodeDecoderMetaData");
+var QRCodeReader_1 = require("../../qrcode/QRCodeReader");
+var ReaderException_1 = require("../../ReaderException");
+var Result_1 = require("../../Result");
+var ResultMetadataType_1 = require("../../ResultMetadataType");
+var ByteArrayOutputStream_1 = require("../../util/ByteArrayOutputStream");
+var Collections_1 = require("../../util/Collections");
+var Integer_1 = require("../../util/Integer");
+var StringBuilder_1 = require("../../util/StringBuilder");
+var MultiDetector_1 = require("./detector/MultiDetector");
+// package com.google.zxing.multi.qrcode;
+// import com.google.zxing.BarcodeFormat;
+// import com.google.zxing.BinaryBitmap;
+// import com.google.zxing.DecodeHintType;
+// import com.google.zxing.NotFoundException;
+// import com.google.zxing.ReaderException;
+// import com.google.zxing.Result;
+// import com.google.zxing.ResultMetadataType;
+// import com.google.zxing.ResultPoint;
+// import com.google.zxing.common.DecoderResult;
+// import com.google.zxing.common.DetectorResult;
+// import com.google.zxing.multi.MultipleBarcodeReader;
+// import com.google.zxing.multi.qrcode.detector.MultiDetector;
+// import com.google.zxing.qrcode.QRCodeReader;
+// import com.google.zxing.qrcode.decoder.QRCodeDecoderMetaData;
+// import java.io.ByteArrayOutputStream;
+// import java.io.Serializable;
+// import java.util.ArrayList;
+// import java.util.List;
+// import java.util.Map;
+// import java.util.Collections;
+// import java.util.Comparator;
+/**
+ * This implementation can detect and decode multiple QR Codes in an image.
+ *
+ * @author Sean Owen
+ * @author Hannes Erven
+ */
+var QRCodeMultiReader = /** @class */ (function (_super) {
+    __extends(QRCodeMultiReader, _super);
+    function QRCodeMultiReader() {
+        return _super !== null && _super.apply(this, arguments) || this;
+    }
+    /**
+     * TYPESCRIPTPORT: this is an overloaded method so here it'll work only as a entrypoint for choosing which overload to call.
+     */
+    QRCodeMultiReader.prototype.decodeMultiple = function (image, hints) {
+        if (hints === void 0) { hints = null; }
+        if (hints && hints instanceof Map) {
+            return this.decodeMultipleImpl(image, hints);
+        }
+        return this.decodeMultipleOverload1(image);
+    };
+    /**
+     * @throws NotFoundException
+     * @override decodeMultiple
+     */
+    QRCodeMultiReader.prototype.decodeMultipleOverload1 = function (image) {
+        return this.decodeMultipleImpl(image, null);
+    };
+    /**
+     * @override
+     * @throws NotFoundException
+     */
+    QRCodeMultiReader.prototype.decodeMultipleImpl = function (image, hints) {
+        var e_1, _a;
+        var results = [];
+        var detectorResults = new MultiDetector_1.default(image.getBlackMatrix()).detectMulti(hints);
+        try {
+            for (var detectorResults_1 = __values(detectorResults), detectorResults_1_1 = detectorResults_1.next(); !detectorResults_1_1.done; detectorResults_1_1 = detectorResults_1.next()) {
+                var detectorResult = detectorResults_1_1.value;
+                try {
+                    var decoderResult = this.getDecoder().decodeBitMatrix(detectorResult.getBits(), hints);
+                    var points = detectorResult.getPoints();
+                    // If the code was mirrored: swap the bottom-left and the top-right points.
+                    if (decoderResult.getOther() instanceof QRCodeDecoderMetaData_1.default) {
+                        decoderResult.getOther().applyMirroredCorrection(points);
+                    }
+                    var result = new Result_1.default(decoderResult.getText(), decoderResult.getRawBytes(), points, BarcodeFormat_1.default.QR_CODE);
+                    var byteSegments = decoderResult.getByteSegments();
+                    if (byteSegments != null) {
+                        result.putMetadata(ResultMetadataType_1.default.BYTE_SEGMENTS, byteSegments);
+                    }
+                    var ecLevel = decoderResult.getECLevel();
+                    if (ecLevel != null) {
+                        result.putMetadata(ResultMetadataType_1.default.ERROR_CORRECTION_LEVEL, ecLevel);
+                    }
+                    if (decoderResult.hasStructuredAppend()) {
+                        result.putMetadata(ResultMetadataType_1.default.STRUCTURED_APPEND_SEQUENCE, decoderResult.getStructuredAppendSequenceNumber());
+                        result.putMetadata(ResultMetadataType_1.default.STRUCTURED_APPEND_PARITY, decoderResult.getStructuredAppendParity());
+                    }
+                    results.push(result);
+                }
+                catch (re) {
+                    if (re instanceof ReaderException_1.default) {
+                        // ignore and continue
+                    }
+                    else {
+                        throw re;
+                    }
+                }
+            }
+        }
+        catch (e_1_1) { e_1 = { error: e_1_1 }; }
+        finally {
+            try {
+                if (detectorResults_1_1 && !detectorResults_1_1.done && (_a = detectorResults_1.return)) _a.call(detectorResults_1);
+            }
+            finally { if (e_1) throw e_1.error; }
+        }
+        if (results.length === 0) {
+            return QRCodeMultiReader.EMPTY_RESULT_ARRAY;
+        }
+        else {
+            results = QRCodeMultiReader.processStructuredAppend(results);
+            return results /* .toArray(QRCodeMultiReader.EMPTY_RESULT_ARRAY) */;
+        }
+    };
+    QRCodeMultiReader.processStructuredAppend = function (results) {
+        var e_2, _a, e_3, _b, e_4, _c;
+        var newResults = [];
+        var saResults = [];
+        try {
+            for (var results_1 = __values(results), results_1_1 = results_1.next(); !results_1_1.done; results_1_1 = results_1.next()) {
+                var result = results_1_1.value;
+                if (result.getResultMetadata().has(ResultMetadataType_1.default.STRUCTURED_APPEND_SEQUENCE)) {
+                    saResults.push(result);
+                }
+                else {
+                    newResults.push(result);
+                }
+            }
+        }
+        catch (e_2_1) { e_2 = { error: e_2_1 }; }
+        finally {
+            try {
+                if (results_1_1 && !results_1_1.done && (_a = results_1.return)) _a.call(results_1);
+            }
+            finally { if (e_2) throw e_2.error; }
+        }
+        if (saResults.length === 0) {
+            return results;
+        }
+        // sort and concatenate the SA list items
+        Collections_1.default.sort(saResults, new SAComparator());
+        var newText = new StringBuilder_1.default();
+        var newRawBytes = new ByteArrayOutputStream_1.default();
+        var newByteSegment = new ByteArrayOutputStream_1.default();
+        try {
+            for (var saResults_1 = __values(saResults), saResults_1_1 = saResults_1.next(); !saResults_1_1.done; saResults_1_1 = saResults_1.next()) {
+                var saResult = saResults_1_1.value;
+                newText.append(saResult.getText());
+                var saBytes = saResult.getRawBytes();
+                newRawBytes.writeBytesOffset(saBytes, 0, saBytes.length);
+                // @SuppressWarnings("unchecked")
+                var byteSegments = saResult.getResultMetadata().get(ResultMetadataType_1.default.BYTE_SEGMENTS);
+                if (byteSegments != null) {
+                    try {
+                        for (var byteSegments_1 = (e_4 = void 0, __values(byteSegments)), byteSegments_1_1 = byteSegments_1.next(); !byteSegments_1_1.done; byteSegments_1_1 = byteSegments_1.next()) {
+                            var segment = byteSegments_1_1.value;
+                            newByteSegment.writeBytesOffset(segment, 0, segment.length);
+                        }
+                    }
+                    catch (e_4_1) { e_4 = { error: e_4_1 }; }
+                    finally {
+                        try {
+                            if (byteSegments_1_1 && !byteSegments_1_1.done && (_c = byteSegments_1.return)) _c.call(byteSegments_1);
+                        }
+                        finally { if (e_4) throw e_4.error; }
+                    }
+                }
+            }
+        }
+        catch (e_3_1) { e_3 = { error: e_3_1 }; }
+        finally {
+            try {
+                if (saResults_1_1 && !saResults_1_1.done && (_b = saResults_1.return)) _b.call(saResults_1);
+            }
+            finally { if (e_3) throw e_3.error; }
+        }
+        var newResult = new Result_1.default(newText.toString(), newRawBytes.toByteArray(), QRCodeMultiReader.NO_POINTS, BarcodeFormat_1.default.QR_CODE);
+        if (newByteSegment.size() > 0) {
+            newResult.putMetadata(ResultMetadataType_1.default.BYTE_SEGMENTS, Collections_1.default.singletonList(newByteSegment.toByteArray()));
+        }
+        newResults.push(newResult); // TYPESCRIPTPORT: inserted element at the start of the array because it seems the Java version does that as well.
+        return newResults;
+    };
+    QRCodeMultiReader.EMPTY_RESULT_ARRAY = [];
+    QRCodeMultiReader.NO_POINTS = new Array();
+    return QRCodeMultiReader;
+}(QRCodeReader_1.default));
+exports.default = QRCodeMultiReader;
+/* private static final*/ var SAComparator = /** @class */ (function () {
+    function SAComparator() {
+    }
+    /**
+     * @override
+     */
+    SAComparator.prototype.compare = function (a, b) {
+        var aNumber = a.getResultMetadata().get(ResultMetadataType_1.default.STRUCTURED_APPEND_SEQUENCE);
+        var bNumber = b.getResultMetadata().get(ResultMetadataType_1.default.STRUCTURED_APPEND_SEQUENCE);
+        return Integer_1.default.compare(aNumber, bNumber);
+    };
+    return SAComparator;
+}());
+//# sourceMappingURL=QRCodeMultiReader.js.map
