@@ -37,6 +37,22 @@ var __values = (this && this.__values) || function(o) {
     };
     throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
 };
+var __read = (this && this.__read) || function (o, n) {
+    var m = typeof Symbol === "function" && o[Symbol.iterator];
+    if (!m) return o;
+    var i = m.call(o), r, ar = [], e;
+    try {
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
+    }
+    catch (error) { e = { error: error }; }
+    finally {
+        try {
+            if (r && !r.done && (m = i["return"])) m.call(i);
+        }
+        finally { if (e) throw e.error; }
+    }
+    return ar;
+};
 import BarcodeFormat from '../../BarcodeFormat';
 import QRCodeDecoderMetaData from '../../qrcode/decoder/QRCodeDecoderMetaData';
 import QRCodeReader from '../../qrcode/QRCodeReader';
@@ -152,19 +168,22 @@ var QRCodeMultiReader = /** @class */ (function (_super) {
             return QRCodeMultiReader.EMPTY_RESULT_ARRAY;
         }
         else {
-            results = QRCodeMultiReader.processStructuredAppend(results);
             return results /* .toArray(QRCodeMultiReader.EMPTY_RESULT_ARRAY) */;
         }
     };
     QRCodeMultiReader.processStructuredAppend = function (results) {
-        var e_2, _a, e_3, _b, e_4, _c;
+        var e_2, _a, e_3, _b, e_4, _c, e_5, _d;
         var newResults = [];
-        var saResults = [];
+        var saResultsMap = new Map();
         try {
             for (var results_1 = __values(results), results_1_1 = results_1.next(); !results_1_1.done; results_1_1 = results_1.next()) {
                 var result = results_1_1.value;
                 if (result.getResultMetadata().has(ResultMetadataType.STRUCTURED_APPEND_SEQUENCE)) {
-                    saResults.push(result);
+                    var parity = result.getResultMetadata().has(ResultMetadataType.STRUCTURED_APPEND_PARITY) ? result.getResultMetadata().get(ResultMetadataType.STRUCTURED_APPEND_PARITY) : -1;
+                    if (!saResultsMap.has(parity)) {
+                        saResultsMap.set(parity, []);
+                    }
+                    saResultsMap.get(parity).push(result);
                 }
                 else {
                     newResults.push(result);
@@ -178,51 +197,63 @@ var QRCodeMultiReader = /** @class */ (function (_super) {
             }
             finally { if (e_2) throw e_2.error; }
         }
-        if (saResults.length === 0) {
+        if (saResultsMap.size === 0) {
             return results;
         }
-        // sort and concatenate the SA list items
-        Collections.sort(saResults, new SAComparator());
-        var newText = new StringBuilder();
-        var newRawBytes = new ByteArrayOutputStream();
-        var newByteSegment = new ByteArrayOutputStream();
         try {
-            for (var saResults_1 = __values(saResults), saResults_1_1 = saResults_1.next(); !saResults_1_1.done; saResults_1_1 = saResults_1.next()) {
-                var saResult = saResults_1_1.value;
-                newText.append(saResult.getText());
-                var saBytes = saResult.getRawBytes();
-                newRawBytes.writeBytesOffset(saBytes, 0, saBytes.length);
-                // @SuppressWarnings("unchecked")
-                var byteSegments = saResult.getResultMetadata().get(ResultMetadataType.BYTE_SEGMENTS);
-                if (byteSegments != null) {
-                    try {
-                        for (var byteSegments_1 = (e_4 = void 0, __values(byteSegments)), byteSegments_1_1 = byteSegments_1.next(); !byteSegments_1_1.done; byteSegments_1_1 = byteSegments_1.next()) {
-                            var segment = byteSegments_1_1.value;
-                            newByteSegment.writeBytesOffset(segment, 0, segment.length);
+            // sort and concatenate the SA list items
+            for (var saResultsMap_1 = __values(saResultsMap), saResultsMap_1_1 = saResultsMap_1.next(); !saResultsMap_1_1.done; saResultsMap_1_1 = saResultsMap_1.next()) {
+                var _e = __read(saResultsMap_1_1.value, 2), saResults = _e[1];
+                Collections.sort(saResults, new SAComparator());
+                var newText = new StringBuilder();
+                var newRawBytes = new ByteArrayOutputStream();
+                var newByteSegment = new ByteArrayOutputStream();
+                try {
+                    for (var saResults_1 = (e_4 = void 0, __values(saResults)), saResults_1_1 = saResults_1.next(); !saResults_1_1.done; saResults_1_1 = saResults_1.next()) {
+                        var saResult = saResults_1_1.value;
+                        newText.append(saResult.getText());
+                        var saBytes = saResult.getRawBytes();
+                        newRawBytes.writeBytesOffset(saBytes, 0, saBytes.length);
+                        // @SuppressWarnings("unchecked")
+                        var byteSegments = saResult.getResultMetadata().get(ResultMetadataType.BYTE_SEGMENTS);
+                        if (byteSegments != null) {
+                            try {
+                                for (var byteSegments_1 = (e_5 = void 0, __values(byteSegments)), byteSegments_1_1 = byteSegments_1.next(); !byteSegments_1_1.done; byteSegments_1_1 = byteSegments_1.next()) {
+                                    var segment = byteSegments_1_1.value;
+                                    newByteSegment.writeBytesOffset(segment, 0, segment.length);
+                                }
+                            }
+                            catch (e_5_1) { e_5 = { error: e_5_1 }; }
+                            finally {
+                                try {
+                                    if (byteSegments_1_1 && !byteSegments_1_1.done && (_d = byteSegments_1.return)) _d.call(byteSegments_1);
+                                }
+                                finally { if (e_5) throw e_5.error; }
+                            }
                         }
-                    }
-                    catch (e_4_1) { e_4 = { error: e_4_1 }; }
-                    finally {
-                        try {
-                            if (byteSegments_1_1 && !byteSegments_1_1.done && (_c = byteSegments_1.return)) _c.call(byteSegments_1);
-                        }
-                        finally { if (e_4) throw e_4.error; }
                     }
                 }
+                catch (e_4_1) { e_4 = { error: e_4_1 }; }
+                finally {
+                    try {
+                        if (saResults_1_1 && !saResults_1_1.done && (_c = saResults_1.return)) _c.call(saResults_1);
+                    }
+                    finally { if (e_4) throw e_4.error; }
+                }
+                var newResult = new Result(newText.toString(), newRawBytes.toByteArray(), QRCodeMultiReader.NO_POINTS, BarcodeFormat.QR_CODE);
+                if (newByteSegment.size() > 0) {
+                    newResult.putMetadata(ResultMetadataType.BYTE_SEGMENTS, Collections.singletonList(newByteSegment.toByteArray()));
+                }
+                newResults.push(newResult); // TYPESCRIPTPORT: inserted element at the start of the array because it seems the Java version does that as well.
             }
         }
         catch (e_3_1) { e_3 = { error: e_3_1 }; }
         finally {
             try {
-                if (saResults_1_1 && !saResults_1_1.done && (_b = saResults_1.return)) _b.call(saResults_1);
+                if (saResultsMap_1_1 && !saResultsMap_1_1.done && (_b = saResultsMap_1.return)) _b.call(saResultsMap_1);
             }
             finally { if (e_3) throw e_3.error; }
         }
-        var newResult = new Result(newText.toString(), newRawBytes.toByteArray(), QRCodeMultiReader.NO_POINTS, BarcodeFormat.QR_CODE);
-        if (newByteSegment.size() > 0) {
-            newResult.putMetadata(ResultMetadataType.BYTE_SEGMENTS, Collections.singletonList(newByteSegment.toByteArray()));
-        }
-        newResults.push(newResult); // TYPESCRIPTPORT: inserted element at the start of the array because it seems the Java version does that as well.
         return newResults;
     };
     QRCodeMultiReader.EMPTY_RESULT_ARRAY = [];

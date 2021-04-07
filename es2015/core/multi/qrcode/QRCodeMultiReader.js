@@ -112,46 +112,51 @@ export default /*public final*/ class QRCodeMultiReader extends QRCodeReader {
             return QRCodeMultiReader.EMPTY_RESULT_ARRAY;
         }
         else {
-            results = QRCodeMultiReader.processStructuredAppend(results);
             return results /* .toArray(QRCodeMultiReader.EMPTY_RESULT_ARRAY) */;
         }
     }
     static processStructuredAppend(results) {
         const newResults = [];
-        const saResults = [];
+        const saResultsMap = new Map();
         for (const result of results) {
             if (result.getResultMetadata().has(ResultMetadataType.STRUCTURED_APPEND_SEQUENCE)) {
-                saResults.push(result);
+                const parity = result.getResultMetadata().has(ResultMetadataType.STRUCTURED_APPEND_PARITY) ? result.getResultMetadata().get(ResultMetadataType.STRUCTURED_APPEND_PARITY) : -1;
+                if (!saResultsMap.has(parity)) {
+                    saResultsMap.set(parity, []);
+                }
+                saResultsMap.get(parity).push(result);
             }
             else {
                 newResults.push(result);
             }
         }
-        if (saResults.length === 0) {
+        if (saResultsMap.size === 0) {
             return results;
         }
         // sort and concatenate the SA list items
-        Collections.sort(saResults, new SAComparator());
-        const newText = new StringBuilder();
-        const newRawBytes = new ByteArrayOutputStream();
-        const newByteSegment = new ByteArrayOutputStream();
-        for (const saResult of saResults) {
-            newText.append(saResult.getText());
-            const saBytes = saResult.getRawBytes();
-            newRawBytes.writeBytesOffset(saBytes, 0, saBytes.length);
-            // @SuppressWarnings("unchecked")
-            const byteSegments = saResult.getResultMetadata().get(ResultMetadataType.BYTE_SEGMENTS);
-            if (byteSegments != null) {
-                for (const segment of byteSegments) {
-                    newByteSegment.writeBytesOffset(segment, 0, segment.length);
+        for (const [, saResults] of saResultsMap) {
+            Collections.sort(saResults, new SAComparator());
+            const newText = new StringBuilder();
+            const newRawBytes = new ByteArrayOutputStream();
+            const newByteSegment = new ByteArrayOutputStream();
+            for (const saResult of saResults) {
+                newText.append(saResult.getText());
+                const saBytes = saResult.getRawBytes();
+                newRawBytes.writeBytesOffset(saBytes, 0, saBytes.length);
+                // @SuppressWarnings("unchecked")
+                const byteSegments = saResult.getResultMetadata().get(ResultMetadataType.BYTE_SEGMENTS);
+                if (byteSegments != null) {
+                    for (const segment of byteSegments) {
+                        newByteSegment.writeBytesOffset(segment, 0, segment.length);
+                    }
                 }
             }
+            const newResult = new Result(newText.toString(), newRawBytes.toByteArray(), QRCodeMultiReader.NO_POINTS, BarcodeFormat.QR_CODE);
+            if (newByteSegment.size() > 0) {
+                newResult.putMetadata(ResultMetadataType.BYTE_SEGMENTS, Collections.singletonList(newByteSegment.toByteArray()));
+            }
+            newResults.push(newResult); // TYPESCRIPTPORT: inserted element at the start of the array because it seems the Java version does that as well.
         }
-        const newResult = new Result(newText.toString(), newRawBytes.toByteArray(), QRCodeMultiReader.NO_POINTS, BarcodeFormat.QR_CODE);
-        if (newByteSegment.size() > 0) {
-            newResult.putMetadata(ResultMetadataType.BYTE_SEGMENTS, Collections.singletonList(newByteSegment.toByteArray()));
-        }
-        newResults.push(newResult); // TYPESCRIPTPORT: inserted element at the start of the array because it seems the Java version does that as well.
         return newResults;
     }
 }
