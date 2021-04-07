@@ -133,7 +133,6 @@ export default /*public final*/ class QRCodeMultiReader extends QRCodeReader imp
     if (results.length === 0) {
       return QRCodeMultiReader.EMPTY_RESULT_ARRAY;
     } else {
-      results = QRCodeMultiReader.processStructuredAppend(results);
       return results/* .toArray(QRCodeMultiReader.EMPTY_RESULT_ARRAY) */;
     }
   }
