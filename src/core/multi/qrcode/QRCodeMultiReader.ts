@@ -139,42 +139,48 @@ export default /*public final*/ class QRCodeMultiReader extends QRCodeReader imp
 
   static processStructuredAppend( results: List<Result>): List<Result> {
     const newResults: List<Result> = [];
-    const saResults: List<Result> = [];
+    const saResultsMap: Map<number, List<Result>> = new Map();
     for (const result of results) {
       if (result.getResultMetadata().has(ResultMetadataType.STRUCTURED_APPEND_SEQUENCE)) {
-        saResults.push(result);
+        const parity = result.getResultMetadata().has(ResultMetadataType.STRUCTURED_APPEND_PARITY) ?result.getResultMetadata().get(ResultMetadataType.STRUCTURED_APPEND_PARITY) as number : -1
+        if (!saResultsMap.has(parity)) {
+          saResultsMap.set(parity, [])
+        }
+        saResultsMap.get(parity).push(result)
       } else {
         newResults.push(result);
       }
     }
-    if (saResults.length === 0) {
+    if (saResultsMap.size === 0) {
       return results;
     }
 
     // sort and concatenate the SA list items
-    Collections.sort(saResults, new SAComparator());
-    const newText: StringBuilder = new StringBuilder();
-    const newRawBytes: ByteArrayOutputStream = new ByteArrayOutputStream();
-    const newByteSegment: ByteArrayOutputStream = new ByteArrayOutputStream();
-    for (const saResult of saResults) {
-      newText.append(saResult.getText());
-      const saBytes: Uint8Array = saResult.getRawBytes();
-      newRawBytes.writeBytesOffset(saBytes, 0, saBytes.length);
-      // @SuppressWarnings("unchecked")
-      const byteSegments: Iterable<Uint8Array> =
-          <Iterable<Uint8Array>> saResult.getResultMetadata().get(ResultMetadataType.BYTE_SEGMENTS);
-      if (byteSegments != null) {
-        for (const segment of byteSegments) {
-          newByteSegment.writeBytesOffset(segment, 0, segment.length);
+    for (const [, saResults] of saResultsMap) {
+      Collections.sort(saResults, new SAComparator());
+      const newText: StringBuilder = new StringBuilder();
+      const newRawBytes: ByteArrayOutputStream = new ByteArrayOutputStream();
+      const newByteSegment: ByteArrayOutputStream = new ByteArrayOutputStream();
+      for (const saResult of saResults) {
+        newText.append(saResult.getText());
+        const saBytes: Uint8Array = saResult.getRawBytes();
+        newRawBytes.writeBytesOffset(saBytes, 0, saBytes.length);
+        // @SuppressWarnings("unchecked")
+        const byteSegments: Iterable<Uint8Array> =
+           <Iterable<Uint8Array>> saResult.getResultMetadata().get(ResultMetadataType.BYTE_SEGMENTS);
+        if (byteSegments != null) {
+          for (const segment of byteSegments) {
+            newByteSegment.writeBytesOffset(segment, 0, segment.length);
+          }
         }
       }
-    }
 
-    const newResult: Result = new Result(newText.toString(), newRawBytes.toByteArray(), QRCodeMultiReader.NO_POINTS, BarcodeFormat.QR_CODE);
-    if (newByteSegment.size() > 0) {
-      newResult.putMetadata(ResultMetadataType.BYTE_SEGMENTS, Collections.singletonList(newByteSegment.toByteArray()));
+      const newResult: Result = new Result(newText.toString(), newRawBytes.toByteArray(), QRCodeMultiReader.NO_POINTS, BarcodeFormat.QR_CODE);
+      if (newByteSegment.size() > 0) {
+        newResult.putMetadata(ResultMetadataType.BYTE_SEGMENTS, Collections.singletonList(newByteSegment.toByteArray()));
+      }
+      newResults.push(newResult); // TYPESCRIPTPORT: inserted element at the start of the array because it seems the Java version does that as well.
     }
-    newResults.push(newResult); // TYPESCRIPTPORT: inserted element at the start of the array because it seems the Java version does that as well.
     return newResults;
   }
 
